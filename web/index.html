@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	   
+	<meta charset="UTF-8">
+	   
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	    <title>WebSocket Client</title>
+</head>
+
+<style>
+	.container {
+		display: grid;
+		height: 100vh;
+		place-items: center;
+	}
+
+	.grid {
+		display: grid;
+		grid-template-columns: repeat(255, 1fr);
+		grid-template-rows: repeat(255, 1fr);
+		height: 5500px;
+		width: 5500px;
+	}
+
+	.cell {
+		border: 1px solid lightblue;
+	}
+</style>
+
+<body>
+	<div class="container">
+		<div class="grid"></div>
+	</div>
+
+	<script>
+
+		let currentColor;
+
+		const activate = (element) => {
+			element.style.backgroundColor = currentColor;
+		}
+
+		const colorMap = new Map();
+
+		colorMap.set("0", 'black');
+		colorMap.set("1", 'blue');
+		colorMap.set("2", 'green');
+		colorMap.set("3", 'yellow');
+		colorMap.set("4", 'purple');
+		colorMap.set("5", 'orange');
+		colorMap.set("6", 'red');
+		colorMap.set("7", 'white');
+		colorMap.set("8", 'gray');
+
+		document.addEventListener("DOMContentLoaded", function () {
+			const gridElement = document.querySelector('.grid');
+
+
+			for (let y = 0; y <= 255; y++) {
+				for (let x = 0; x < 255; x++) {
+					const cell = document.createElement("div");
+					cell.classList.add("cell");
+
+					cell.dataset.x = x;
+					cell.dataset.y = y;
+
+					gridElement.appendChild(cell);
+				}
+			}
+
+			const cells = document.querySelectorAll('.cell');
+
+			cells.forEach(cell => {
+				cell.addEventListener('click', activate);
+			});
+		});
+
+		let ws;
+
+		function connect() {
+			ws = new WebSocket("ws://localhost:8080/ws");
+
+			ws.onopen = function () {
+				console.log("Connected to WebSocket server");
+			};
+
+			ws.onmessage = function (event) {
+				const coords = JSON.parse(event.data);
+				console.log(coords)
+				const selector = `.cell[data-x="${coords.X}"][data-y="${coords.Y}"]`;
+				const pixelElement = document.querySelector(selector);
+
+				if (pixelElement) {
+					if (colorMap.has(coords.Color)) {
+						currentColor = colorMap.get(coords.Color);
+					} else {
+						currentColor = "black";
+					}
+					activate(pixelElement);
+				} else {
+					console.error(`Pixel não encontrado para as coordenadas X: ${coords.X}, Y: ${coords.Y}`);
+				}
+			};
+
+			ws.onclose = function () {
+				console.log("WebSocket connection closed, retrying...");
+				setTimeout(connect, 1000);
+			};
+
+			ws.onerror = function (error) {
+				console.error("WebSocket error:", error);
+			};
+		}
+
+
+		connect();
+	</script>    
+</body>
+
+</html>
