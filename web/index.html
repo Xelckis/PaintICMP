@@ -2,80 +2,61 @@
 <html lang="en">
 
 <head>
-	   
 	<meta charset="UTF-8">
-	   
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	    <title>WebSocket Client</title>
-</head>
-
-<style>
-	.container {
-		display: grid;
-		height: 100vh;
-		place-items: center;
-	}
-
-	.grid {
-		display: grid;
-		grid-template-columns: repeat(255, 1fr);
-		grid-template-rows: repeat(255, 1fr);
-		height: 5500px;
-		width: 5500px;
-	}
-
-	.cell {
-		border: 1px solid lightblue;
-	}
-</style>
-
-<body>
-	<div class="container">
-		<div class="grid"></div>
-	</div>
-
-	<script>
-
-		let currentColor;
-
-		const activate = (element) => {
-			element.style.backgroundColor = currentColor;
+	<title>WebSocket Client</title>
+	<style>
+		html,
+		body {
+			margin: 0;
+			padding: 0;
+			width: 100vw;
+			height: 100vh;
+			background-color: #1e1e1e;
+			overflow: hidden;
+			display: flex;
+			justify-content: center;
+			align-items: center;
 		}
 
+		canvas {
+			width: 100%;
+			height: 100%;
+
+			object-fit: contain;
+
+			image-rendering: pixelated;
+		}
+	</style>
+</head>
+
+<body>
+
+	<canvas id="monitor" width="256" height="256"></canvas>
+
+	<script>
+		let currentColor;
+
 		const colorMap = new Map();
+		colorMap.set("0", '#000000'); // Black
+		colorMap.set("1", '#0000AA'); // Dark Blue
+		colorMap.set("2", '#00AA00'); // Dark Green
+		colorMap.set("3", '#00AAAA'); // Dark Cyan
+		colorMap.set("4", '#AA0000'); // Dark Red
+		colorMap.set("5", '#AA00AA'); // Dark Magenta
+		colorMap.set("6", '#AA5500'); // Brown
+		colorMap.set("7", '#AAAAAA'); // Light Gray
+		colorMap.set("8", '#555555'); // Dark Gray
+		colorMap.set("9", '#5555FF'); // Bright Blue
+		colorMap.set("10", '#55FF55'); // Bright Green
+		colorMap.set("11", '#55FFFF'); // Bright Cyan
+		colorMap.set("12", '#FF5555'); // Bright Red
+		colorMap.set("13", '#FF55FF'); // Bright Magenta
+		colorMap.set("14", '#FFFF55'); // Yellow
+		colorMap.set("15", '#FFFFFF'); // White
 
-		colorMap.set("0", 'black');
-		colorMap.set("1", 'blue');
-		colorMap.set("2", 'green');
-		colorMap.set("3", 'yellow');
-		colorMap.set("4", 'purple');
-		colorMap.set("5", 'orange');
-		colorMap.set("6", 'red');
-		colorMap.set("7", 'white');
-		colorMap.set("8", 'gray');
-
-		document.addEventListener("DOMContentLoaded", function () {
-			const gridElement = document.querySelector('.grid');
-
-
-			for (let y = 0; y <= 255; y++) {
-				for (let x = 0; x < 255; x++) {
-					const cell = document.createElement("div");
-					cell.classList.add("cell");
-
-					cell.dataset.x = x;
-					cell.dataset.y = y;
-
-					gridElement.appendChild(cell);
-				}
-			}
-
-			const cells = document.querySelectorAll('.cell');
-
-			cells.forEach(cell => {
-				cell.addEventListener('click', activate);
-			});
-		});
+		const canvas = document.getElementById('monitor');
+		const ctx = canvas.getContext('2d', {alpha: false});
 
 		let ws;
 
@@ -88,20 +69,15 @@
 
 			ws.onmessage = function (event) {
 				const coords = JSON.parse(event.data);
-				console.log(coords)
-				const selector = `.cell[data-x="${coords.X}"][data-y="${coords.Y}"]`;
-				const pixelElement = document.querySelector(selector);
 
-				if (pixelElement) {
-					if (colorMap.has(coords.Color)) {
-						currentColor = colorMap.get(coords.Color);
-					} else {
-						currentColor = "black";
-					}
-					activate(pixelElement);
+				if (colorMap.has(coords.Color)) {
+					currentColor = colorMap.get(coords.Color);
 				} else {
-					console.error(`Pixel não encontrado para as coordenadas X: ${coords.X}, Y: ${coords.Y}`);
+					currentColor = "black";
 				}
+				ctx.fillStyle = currentColor;
+
+				ctx.fillRect(coords.X, coords.Y, 1, 1);
 			};
 
 			ws.onclose = function () {
@@ -114,9 +90,8 @@
 			};
 		}
 
-
 		connect();
-	</script>    
+	</script>
 </body>
 
 </html>
