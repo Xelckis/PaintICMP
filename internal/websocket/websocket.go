@@ -2,27 +2,24 @@ package websocket
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
+
+	"paint/internal/common"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
-type Pixel struct {
-	X, Y, Color string
-}
-
 type Hub struct {
 	Clients   map[*Client]bool
 	Mu        sync.Mutex
-	Broadcast chan Pixel
+	Broadcast chan *[]common.Pixel
 }
 
 type Client struct {
 	clientConn *websocket.Conn
-	send       chan Pixel
+	send       chan []byte
 }
 
 var (
@@ -37,7 +34,7 @@ var (
 func NewHub() *Hub {
 	return &Hub{
 		Clients:   make(map[*Client]bool),
-		Broadcast: make(chan Pixel, 10000),
+		Broadcast: make(chan *[]common.Pixel, 100),
 	}
 }
 
@@ -48,7 +45,7 @@ func (h *Hub) WsHandler(c *gin.Context) {
 		return
 	}
 
-	client := &Client{clientConn: conn, send: make(chan Pixel, 10000)}
+	client := &Client{clientConn: conn, send: make(chan []byte, 100)}
 	h.AddClient(client)
 
 	go writePump(client)
@@ -64,12 +61,19 @@ func (h *Hub) WsHandler(c *gin.Context) {
 
 func (h *Hub) Start() {
 	for {
-		pixel := <-h.Broadcast
+		pixelSlice := <-h.Broadcast
+
+		pixelBytes := make([]byte, 0, len(*pixelSlice)*3)
+		for _, p := range *pixelSlice {
+			pixelBytes = append(pixelBytes, p.X, p.Y, p.Color)
+		}
+
+		common.PoolPut(pixelSlice)
 
 		h.Mu.Lock()
 		for client := range h.Clients {
 			select {
-			case client.send <- pixel:
+			case client.send <- pixelBytes:
 			default:
 				client.clientConn.Close()
 			}
@@ -81,10 +85,9 @@ func (h *Hub) Start() {
 func writePump(conn *Client) {
 	defer conn.clientConn.Close()
 
-	for pixel := range conn.send {
-		log.Printf("Recebi o pixel aqui do outro lado: X: %s Y: %s Color: %s", pixel.X, pixel.Y, pixel.Color)
-		if err := conn.clientConn.WriteJSON(pixel); err != nil {
-			fmt.Println("Error writing JSON:", err)
+	for pixelBytes := range conn.send {
+		if err := conn.clientConn.WriteMessage(websocket.BinaryMessage, pixelBytes); err != nil {
+			fmt.Println("Error writing binary:", err)
 			return
 		}
 	}

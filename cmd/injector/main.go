@@ -18,30 +18,43 @@ var (
 	videoPath = flag.String("video", "video.mp4", "Path to the input video file")
 	width     = flag.Int("width", 64, "Video width to scale to (max 255)")
 	height    = flag.Int("height", 48, "Video height to scale to (max 255)")
-	fps       = flag.Int("fps", 30, "Target framerate")
+	fps       = 30
 )
 
 type RGB struct {
 	R, G, B uint8
 }
 
-var palette = []RGB{
-	{0, 0, 0},       // 0: Black
-	{0, 0, 170},     // 1: Dark Blue
-	{0, 170, 0},     // 2: Dark Green
-	{0, 170, 170},   // 3: Dark Cyan
-	{170, 0, 0},     // 4: Dark Red
-	{170, 0, 170},   // 5: Dark Magenta
-	{170, 85, 0},    // 6: Brown
-	{170, 170, 170}, // 7: Light Gray
-	{85, 85, 85},    // 8: Dark Gray
-	{85, 85, 255},   // 9: Bright Blue
-	{85, 255, 85},   // 10: Bright Green
-	{85, 255, 255},  // 11: Bright Cyan
-	{255, 85, 85},   // 12: Bright Red
-	{255, 85, 255},  // 13: Bright Magenta
-	{255, 255, 85},  // 14: Yellow
-	{255, 255, 255}, // 15: White
+var palette [256]RGB
+
+func init() {
+	basic := []RGB{
+		{0, 0, 0}, {0, 0, 170}, {0, 170, 0}, {0, 170, 170},
+		{170, 0, 0}, {170, 0, 170}, {170, 85, 0}, {170, 170, 170},
+		{85, 85, 85}, {85, 85, 255}, {85, 255, 85}, {85, 255, 255},
+		{255, 85, 85}, {255, 85, 255}, {255, 255, 85}, {255, 255, 255},
+	}
+
+	for i, c := range basic {
+		palette[i] = c
+	}
+
+	idx := 16
+	vals := []uint8{0, 95, 135, 175, 215, 255}
+	for _, r := range vals {
+		for _, g := range vals {
+			for _, b := range vals {
+				palette[idx] = RGB{r, g, b}
+				idx++
+			}
+		}
+	}
+
+	for i := range 24 {
+		v := uint8(8 + i*10)
+		palette[idx] = RGB{v, v, v}
+		idx++
+	}
 }
 
 func findClosestColor(r, g, b uint8) int {
@@ -92,8 +105,8 @@ func main() {
 	}
 	defer conn.Close()
 
-	log.Printf("🌈 Starting COLOR Network-GPU Injector")
-	log.Printf("▶️  Video: %s | Resolution: %dx%d | FPS: %d", *videoPath, *width, *height, *fps)
+	log.Printf("🌈 Starting 256-COLOR Network-GPU Injector")
+	log.Printf("▶️  Video: %s | Resolution: %dx%d | FPS: %d", *videoPath, *width, *height, fps)
 
 	cmd := exec.Command("ffmpeg",
 		"-i", *videoPath,
@@ -123,13 +136,13 @@ func main() {
 		prevFrame[i] = 255
 	}
 
-	frameDuration := time.Second / time.Duration(*fps)
+	frameDuration := time.Second / time.Duration(fps)
 	ticker := time.NewTicker(frameDuration)
 	defer ticker.Stop()
 
 	frameIndex := 0
 
-	log.Println("📡 Broadcasting COLOR frames via ICMP...")
+	log.Println("📡 Broadcasting 256-COLOR frames via ICMP...")
 
 	for {
 		_, err := io.ReadFull(stdout, frameBuffer)
@@ -159,12 +172,17 @@ func main() {
 					SendPixel(conn, x, y, colorID)
 					prevFrame[pixelIdx] = byte(colorID)
 					pixelsSent++
+
+					if pixelsSent%800 == 0 {
+						time.Sleep(1 * time.Microsecond)
+					}
 				}
+
 			}
 		}
 
 		frameIndex++
-		if frameIndex%(*fps) == 0 {
+		if frameIndex%(fps) == 0 {
 			log.Printf("🎞️  Processed Frame %d | Packets injected: %d", frameIndex, pixelsSent)
 		}
 	}
